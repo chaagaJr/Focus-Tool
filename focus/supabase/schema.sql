@@ -61,7 +61,7 @@ create table if not exists public.app_config (
 
 -- Keep updated_at current.
 create or replace function public.focus_touch_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = '' as $$
 begin
   new.updated_at = now();
   return new;
