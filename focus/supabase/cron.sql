@@ -17,10 +17,10 @@ select cron.schedule(
   '* * * * *',   -- every minute
   $$
   select net.http_post(
-    url     := 'https://YOUR-PROJECT-REF.supabase.co/functions/v1/focus',
+    url     := 'https://hyqxytmodzuharzrbpfh.supabase.co/functions/v1/focus',
     headers := jsonb_build_object(
                  'Content-Type', 'application/json',
-                 'x-focus-key',  'YOUR-FOCUS-KEY'
+                 'x-focus-key',  'fk_LEuW2VYQ5ALYRy3Psc81Vle6okYDwpUb'
                ),
     body    := jsonb_build_object('action', 'tick')
   );
