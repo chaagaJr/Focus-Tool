@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en-IE">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Focus</title>
+  <meta name="description" content="Quick notes and reminders that keep at you until they're done.">
+  <meta name="theme-color" content="#f6f8fb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141a2e" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Focus">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <h1 class="wordmark">Focus</h1>
+    <button class="sync" id="sync" type="button" title="Sync now"><span class="dot"></span><span class="sync-text">This device only</span></button>
+    <button class="icon-btn" id="open-search" type="button" aria-label="Search" title="Search (/)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+    </button>
+    <button class="icon-btn" id="open-settings" type="button" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>
+    </button>
+  </header>
+
+  <section class="capture" aria-label="Add something">
+    <form id="capture-form" autocomplete="off">
+      <div class="kind-toggle" role="radiogroup" aria-label="What are you adding?">
+        <button type="button" role="radio" data-kind="task" aria-checked="true">Task</button>
+        <button type="button" role="radio" data-kind="person" aria-checked="false">Person</button>
+        <button type="button" role="radio" data-kind="info" aria-checked="false">Info</button>
+      </div>
+      <div class="capture-field">
+        <input id="capture" name="capture" type="text" enterkeyhint="done" autocapitalize="sentences"
+               placeholder="Submit lab report fri 5pm #college" aria-describedby="capture-preview">
+        <button class="add-btn" type="submit" aria-label="Add">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <div class="preview" id="capture-preview" aria-live="polite"></div>
+    </form>
+    <div class="search-field" id="search-wrap" hidden>
+      <input id="search" type="search" placeholder="Search everything" aria-label="Search">
+      <button type="button" class="text-btn" id="close-search">Close</button>
+    </div>
+  </section>
+
+  <nav class="tabs" aria-label="Sections">
+    <button type="button" data-view="tasks" aria-pressed="true">Tasks <span class="count" id="count-tasks"></span></button>
+    <button type="button" data-view="people" aria-pressed="false">People <span class="count" id="count-people"></span></button>
+    <button type="button" data-view="info" aria-pressed="false">Info <span class="count" id="count-info"></span></button>
+  </nav>
+
+  <div class="tag-filter" id="tag-filter" aria-label="Filter"></div>
+
+  <main class="board">
+    <section class="col col-tasks" id="col-tasks" aria-label="Tasks">
+      <h2 class="col-title">Tasks</h2>
+      <div id="tasks"></div>
+    </section>
+    <div class="side">
+      <section class="col col-people" id="col-people" aria-label="People">
+        <h2 class="col-title">People</h2>
+        <div id="people"></div>
+      </section>
+      <section class="col col-info" id="col-info" aria-label="Info">
+        <h2 class="col-title">Info</h2>
+        <div id="info"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Edit anything -->
+  <dialog id="editor" class="sheet" aria-labelledby="editor-heading">
+    <form method="dialog" id="editor-form">
+      <div class="sheet-head">
+        <h2 id="editor-heading">Edit</h2>
+        <button class="text-btn" value="cancel" formnovalidate>Close</button>
+      </div>
+      <p class="hint" id="ed-source" hidden></p>
+      <label class="field">
+        <span id="title-label">Title</span>
+        <input name="title" required maxlength="500">
+      </label>
+      <label class="field">
+        <span>Notes</span>
+        <textarea name="body" rows="3" placeholder="Anything that helps future you"></textarea>
+      </label>
+
+      <!-- tasks -->
+      <div class="field" data-kinds="task">
+        <span id="due-label">Deadline</span>
+        <input name="due_at" type="datetime-local" aria-labelledby="due-label">
+        <div class="chips"><button type="button" id="ed-plan">Plan check-ins before it</button></div>
+        <p class="hint small" id="plan-status"></p>
+      </div>
+      <div class="field" data-kinds="task">
+        <span id="remind-label">Remind me</span>
+        <input name="remind_at" type="datetime-local" aria-labelledby="remind-label">
+        <div class="chips" id="remind-presets">
+          <button type="button" data-preset="1h">In 1 hour</button>
+          <button type="button" data-preset="evening">This evening</button>
+          <button type="button" data-preset="tomorrow">Tomorrow 9:00</button>
+          <button type="button" data-preset="clear">No reminder</button>
+        </div>
+      </div>
+
+      <!-- events -->
+      <div class="field-row" data-kinds="event">
+        <label class="field"><span>Starts</span><input name="ev_start" type="datetime-local"></label>
+        <label class="field"><span>Ends</span><input name="ev_end" type="datetime-local"></label>
+      </div>
+
+      <div class="field-row" data-kinds="task event">
+        <label class="field" data-kinds="task">
+          <span>Keep reminding</span>
+          <select name="nag_minutes">
+            <option value="">Default</option>
+            <option value="5">Every 5 min</option>
+            <option value="10">Every 10 min</option>
+            <option value="15">Every 15 min</option>
+            <option value="30">Every 30 min</option>
+            <option value="60">Every hour</option>
+            <option value="120">Every 2 hours</option>
+            <option value="0">Just once</option>
+          </select>
+        </label>
+        <label class="field" data-kinds="event">
+          <span>Heads-up</span>
+          <select name="lead_minutes">
+            <option value="">Default</option>
+            <option value="0">None</option>
+            <option value="5">5 min before</option>
+            <option value="10">10 min before</option>
+            <option value="15">15 min before</option>
+            <option value="30">30 min before</option>
+            <option value="60">1 hour before</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Repeat</span>
+          <select name="repeat">
+            <option value="">Never</option>
+            <option value="daily">Every day</option>
+            <option value="weekdays">Every weekday</option>
+            <option value="weekly">Every week</option>
+            <option value="monthly">Every month</option>
+          </select>
+        </label>
+      </div>
+      <label class="field" data-kinds="task">
+        <span>How long it takes</span>
+        <select name="effort_minutes">
+          <option value="">Not sure</option>
+          <option value="5">5 minutes</option>
+          <option value="15">15 minutes</option>
+          <option value="30">Half an hour</option>
+          <option value="60">An hour</option>
+          <option value="120">2 hours</option>
+          <option value="240">Half a day</option>
+        </select>
+      </label>
+      <label class="check-field" data-kinds="task"><input type="checkbox" name="star"> <span>One of today's 3</span></label>
+      <label class="check-field" data-kinds="task"><input type="checkbox" name="priority"> <span>Priority (reminds every 10 minutes unless you choose otherwise)</span></label>
+      <label class="check-field" data-kinds="event"><input type="checkbox" name="busy"> <span>Hold other reminders while this is on</span></label>
+
+      <!-- people -->
+      <div class="field-row" data-kinds="person">
+        <label class="field"><span>Birthday</span><input name="birthday" placeholder="14/3 or 14/3/2004" inputmode="numeric"></label>
+        <label class="field">
+          <span>Catch up</span>
+          <select name="checkin_days">
+            <option value="">No reminders</option>
+            <option value="3">Every few days</option>
+            <option value="7">Every week</option>
+            <option value="14">Every 2 weeks</option>
+            <option value="30">Every month</option>
+            <option value="90">Every few months</option>
+          </select>
+        </label>
+      </div>
+      <div class="field" data-kinds="person">
+        <span>Last in touch</span>
+        <div class="inline-row"><span id="ed-last"></span><button type="button" class="ghost small" id="ed-talked">We talked today</button></div>
+      </div>
+
+      <label class="check-field" data-kinds="info"><input type="checkbox" name="pinned"> <span>Pin to the top</span></label>
+
+      <label class="field">
+        <span>Tags</span>
+        <input name="tags" placeholder="college work" autocapitalize="off">
+      </label>
+
+      <div class="sheet-actions">
+        <button type="submit" class="primary" value="save">Save</button>
+        <button type="button" class="ghost" id="ed-done" data-kinds="task">Mark done</button>
+        <button type="button" class="ghost" id="ed-snooze" data-kinds="task">Snooze 1 hour</button>
+        <button type="button" class="ghost" id="ed-move" data-kinds="task info">Move to Info</button>
+        <button type="button" class="danger" id="ed-delete">Delete</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Weekly review -->
+  <dialog id="review" class="sheet" aria-labelledby="review-heading">
+    <div class="sheet-head">
+      <h2 id="review-heading">Weekly review</h2>
+      <button class="text-btn" type="button" id="close-review">Close</button>
+    </div>
+    <div id="review-body"></div>
+  </dialog>
+
+  <!-- Settings -->
+  <dialog id="settings" class="sheet" aria-labelledby="settings-heading">
+    <div class="sheet-head">
+      <h2 id="settings-heading">Settings</h2>
+      <button class="text-btn" type="button" id="close-settings">Close</button>
+    </div>
+
+    <section class="set-group">
+      <h3>Sync and reminders server</h3>
+      <p class="hint" id="conn-status">Not connected. Everything is saved on this device only, and reminders only show while Focus is open.</p>
+      <form id="conn-form" autocomplete="off">
+        <label class="field"><span>Function URL</span>
+          <input name="url" type="url" placeholder="https://abcdxyz.supabase.co/functions/v1/focus" inputmode="url" autocapitalize="off" spellcheck="false"></label>
+        <label class="field"><span>Your Focus key</span>
+          <input name="key" type="password" placeholder="The FOCUS_KEY you saved in Supabase" autocapitalize="off" spellcheck="false"></label>
+        <label class="check-field" id="upload-wrap" hidden><input type="checkbox" name="upload" checked> <span id="upload-label">Upload what's already on this device</span></label>
+        <div class="row-actions">
+          <button type="submit" class="primary" id="conn-save">Connect</button>
+          <button type="button" class="ghost" id="conn-forget" hidden>Disconnect this device</button>
+          <button type="button" class="ghost" id="gen-key">Make a new key</button>
+        </div>
+        <output class="keybox" id="new-key" hidden></output>
+      </form>
+    </section>
+
+    <section class="set-group">
+      <h3>Notifications on this device</h3>
+      <p class="hint" id="push-status"></p>
+      <div class="row-actions">
+        <button type="button" class="primary" id="push-on">Turn on notifications</button>
+        <button type="button" class="ghost" id="push-test">Send a test</button>
+      </div>
+    </section>
+
+    <section class="set-group" id="cal-group">
+      <h3>Calendars, timetable and college</h3>
+      <p class="hint" id="cal-intro">Add calendar links and Focus keeps them in sync every few hours. Classes and shifts give you a heads-up and hold other reminders while they're on. Assignment deadlines become tasks with check-ins planned before them.</p>
+      <ul class="feed-list" id="feed-list"></ul>
+      <form id="feed-form" autocomplete="off">
+        <div class="field-row">
+          <label class="field"><span>Name</span><input name="name" placeholder="Moodle" maxlength="60"></label>
+          <label class="field"><span>What's in it</span>
+            <select name="type">
+              <option value="timetable">Classes, shifts or plans</option>
+              <option value="deadlines">Assignments and deadlines</option>
+            </select></label>
+        </div>
+        <label class="field"><span>Calendar link (.ics or webcal://)</span>
+          <input name="url" type="url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://moodle.yourcollege.ie/calendar/export_execute.php?…"></label>
+        <div class="field-row">
+          <label class="field"><span>Tag</span><input name="tag" placeholder="college" autocapitalize="off"></label>
+          <label class="field" data-feed="timetable"><span>Heads-up</span>
+            <select name="lead_minutes">
+              <option value="0">None</option><option value="5">5 min before</option><option value="10">10 min before</option>
+              <option value="15" selected>15 min before</option><option value="30">30 min before</option>
+            </select></label>
+        </div>
+        <label class="check-field" data-feed="timetable"><input type="checkbox" name="busy" checked> <span>Hold other reminders while these are on</span></label>
+        <label class="check-field" data-feed="deadlines" hidden><input type="checkbox" name="auto_plan" checked> <span>Plan check-ins before each deadline</span></label>
+        <div class="row-actions"><button type="submit" class="primary">Add calendar</button></div>
+      </form>
+      <details class="help">
+        <summary>Where do I find the link?</summary>
+        <ul>
+          <li><b>Moodle</b>: Calendar → Import or export calendars → Export calendar → choose All events and Recent and next 60 days → Get calendar URL.</li>
+          <li><b>Brightspace</b>: Calendar → the settings icon → Enable calendar feeds → Subscribe.</li>
+          <li><b>Canvas</b>: Calendar → Calendar Feed (bottom right).</li>
+          <li><b>Blackboard</b>: Calendar → Share calendar (or Calendar settings → Get external link).</li>
+          <li><b>College timetable</b>: most timetable pages have Subscribe, Export or "Add to calendar" with an iCal link. Ask IT services if you can't see one.</li>
+          <li><b>Google Calendar</b>: Settings → your calendar → Secret address in iCal format.</li>
+          <li><b>Outlook</b>: Settings → Calendar → Shared calendars → Publish a calendar → ICS link.</li>
+          <li><b>Work rota apps</b> (Deputy, When I Work, Planday and others): look for Calendar sync, Subscribe or iCal in the app's settings.</li>
+        </ul>
+      </details>
+    </section>
+
+    <section class="set-group">
+      <h3>Show Focus in your calendar</h3>
+      <p class="hint">Your tasks with times, deadlines, your own events and birthdays, in Apple Calendar or Outlook. Read-only, updates every hour or so.</p>
+      <div class="row-actions"><button type="button" class="ghost" id="cal-link">Get my calendar link</button></div>
+      <div id="cal-out" hidden>
+        <output class="keybox" id="cal-url"></output>
+        <div class="row-actions"><button type="button" class="ghost" id="cal-copy">Copy link</button><a class="ghost" id="cal-open" href="#">Open in Calendar</a></div>
+        <p class="hint small">iPhone: Settings → Apps → Calendar → Calendar Accounts → Add Account → Other → Add Subscribed Calendar, and paste the link. Outlook: Add calendar → Subscribe from web.</p>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h3>How reminders behave</h3>
+      <form id="prefs-form">
+        <div class="field-row">
+          <label class="field"><span>Keep reminding every</span>
+            <select name="default_nag_minutes">
+              <option value="5">5 minutes</option><option value="10">10 minutes</option>
+              <option value="15">15 minutes</option><option value="30">30 minutes</option>
+              <option value="60">hour</option><option value="120">2 hours</option>
+              <option value="0">Just once</option>
+            </select></label>
+          <label class="field"><span>Day-only reminders at</span>
+            <select name="default_hour"></select></label>
+        </div>
+        <div class="field-row">
+          <label class="field"><span>Quiet from</span><input name="quiet_start" type="time"></label>
+          <label class="field"><span>until</span><input name="quiet_end" type="time"></label>
+        </div>
+        <div class="field-row">
+          <label class="field"><span>Morning summary</span><input name="digest_time" type="time"></label>
+          <label class="field"><span>People nudge</span><input name="people_time" type="time"></label>
+        </div>
+        <div class="field-row">
+          <label class="field"><span>Weekly review on</span>
+            <select name="review_day">
+              <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+              <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
+            </select></label>
+          <label class="field"><span>at</span><input name="review_time" type="time"></label>
+        </div>
+        <div class="field-row">
+          <label class="field"><span>Heads-up before your own events</span>
+            <select name="heads_up_minutes">
+              <option value="0">None</option><option value="10">10 minutes</option><option value="15">15 minutes</option>
+              <option value="30">30 minutes</option><option value="60">1 hour</option>
+            </select></label>
+        </div>
+        <label class="check-field"><input type="checkbox" name="hold_during_busy"> <span>Hold reminders during lectures and shifts</span></label>
+        <p class="hint" id="tz-line"></p>
+        <p class="hint small">Leave a time empty to turn that one off.</p>
+        <div class="row-actions">
+          <button type="submit" class="primary">Save reminder settings</button>
+          <button type="button" class="ghost" id="start-review">Do a weekly review now</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="set-group">
+      <h3>Backup</h3>
+      <p class="hint">The free database plan has no automatic backups, so download one now and then.</p>
+      <div class="row-actions">
+        <button type="button" class="ghost" id="export">Download backup</button>
+        <label class="ghost file-btn">Restore from backup<input type="file" id="import" accept="application/json,.json" hidden></label>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h3>Typing shortcuts</h3>
+      <ul class="cheats">
+        <li><b>fri 5pm</b>, <b>tomorrow at 10</b>, <b>25/11</b>, <b>in 20 min</b>, <b>tonight</b>, <b>next week</b> set a reminder</li>
+        <li><b>essay due 5/12 5pm</b> sets a deadline and reminds you the morning before</li>
+        <li><b>work 5-10pm fri every week</b> (a time range) goes on your schedule</li>
+        <li><b>every tuesday 8pm</b>, <b>daily</b>, <b>every weekday 7:30</b>, <b>monthly</b> make it repeat</li>
+        <li><b>~15m</b> or <b>~1h</b> says how long it takes, for "Got 15 min"</li>
+        <li><b>#college</b> adds a tag, a lone <b>!</b> makes it a priority</li>
+        <li>Person: <b>Aoife bday 14/3 every 2 weeks</b>. Info: <b>Locker code: 4821</b></li>
+        <li>On a computer, press <b>N</b> to start typing and <b>/</b> to search</li>
+      </ul>
+    </section>
+  </dialog>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+</body>
+</html>
