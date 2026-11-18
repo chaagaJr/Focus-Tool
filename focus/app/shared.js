@@ -880,6 +880,7 @@ export function icsOccurrences(text, from, to, fallbackTz = DEFAULT_SETTINGS.tz)
           ? `${ev.uid || title}|${(ev.recurrenceId ? icsTime(ev.recurrenceId, fallbackTz)?.at : occ.start)?.toISOString()}`
           : ev.uid || `${title}|${occ.start.toISOString()}`,
         title: title || 'Untitled',
+        rawTitle: ev.summary || '',
         body: [ev.description, ev.url].filter(Boolean).join('\n').slice(0, 1000),
         location: ev.location || '',
         moduleTag: ev.categories?.length ? slug(ev.categories[0]) : null,
@@ -889,6 +890,55 @@ export function icsOccurrences(text, from, to, fallbackTz = DEFAULT_SETTINGS.tz)
     }
   }
   return out.sort((a, b) => a.start - b.start);
+}
+
+/* ---- Cleaning up noisy calendars (Brightspace publishes "Available", "Start Date", "End Date"
+        and "Due" entries for the same assignment, sometimes more than once) ---- */
+
+const DUE_RX = /\b(?:due|deadline|submission)\b/i;
+const END_RX = /\b(?:end\s*date|ends|availability\s+ends|closes|close\s*date)\b/i;
+const START_RX = /\b(?:available|availability(?:\s+(?:starts|begins|opens))?|opens?|start(?:s|\s*date)?|unlocks?|visible|released?|begins)\b/i;
+const MARKER_RX = /\s*(?:[-–—:|(]\s*)?(?:is\s+)?(?:due(?:\s+date)?|deadline|availability\s+(?:ends|starts|begins|opens)|available(?:\s+from)?|start\s*date|end\s*date|starts|ends|opens|closes|close\s*date)\s*\)?\s*$/i;
+
+/** "Assignment 1 - Availability Ends" → "Assignment 1" */
+export function cleanEventTitle(t) {
+  let s = String(t || '').trim();
+  for (let i = 0; i < 2; i++) s = s.replace(MARKER_RX, '').trim();
+  return s || String(t || '').trim();
+}
+
+/**
+ * Drop the noise from a calendar before importing it.
+ * Deadlines: one task per assignment and day, preferring the "Due" entry; "available"/"starts"
+ * entries are dropped, and when there's no Due entry the latest "ends" one stands in for it.
+ * Timetables: identical entries (same title, same time) are merged.
+ * `skip`: words — anything whose title or notes contains one is left out.
+ */
+export function filterOccurrences(occ, type, skip = []) {
+  const words = (Array.isArray(skip) ? skip : String(skip || '').split(','))
+    .map((w) => String(w).trim().toLowerCase()).filter(Boolean);
+  let list = occ.filter((o) => !words.some((w) => `${o.rawTitle || o.title} ${o.body}`.toLowerCase().includes(w)));
+  const dayKey = (o) => o.start.toISOString().slice(0, 10);
+  const once = (arr, keyFn) => { const seen = new Set(); return arr.filter((o) => { const k = keyFn(o); if (seen.has(k)) return false; seen.add(k); return true; }); };
+
+  if (type !== 'deadlines') {
+    return once(list, (o) => `${o.title.toLowerCase()}|${+o.start}|${+o.end}`);
+  }
+  const groups = new Map();
+  for (const o of list) {
+    const raw = o.rawTitle || o.title;
+    const k = `${cleanEventTitle(o.title).toLowerCase()}|${o.moduleTag || ''}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push({ ...o, title: cleanEventTitle(o.title), _due: DUE_RX.test(raw), _end: END_RX.test(raw), _start: !END_RX.test(raw) && START_RX.test(raw) });
+  }
+  const out = [];
+  for (const g of groups.values()) {
+    const due = g.filter((o) => o._due);
+    let keep = due.length ? due : g.filter((o) => !o._start);
+    if (!due.length && keep.some((o) => o._end)) keep = [keep.reduce((a, b) => (b.start > a.start ? b : a))];
+    out.push(...once(keep, dayKey));
+  }
+  return out.map(({ _due, _end, _start, ...o }) => o).sort((a, b) => a.start - b.start);
 }
 
 /** Text for a .ics file (calendar export). */

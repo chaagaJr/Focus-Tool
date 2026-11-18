@@ -2,7 +2,7 @@
 // shows reminder notifications, and handles their Done / Snooze buttons.
 //
 // When you change any app file, bump VERSION so phones and PCs pick up the new copy.
-const VERSION = 'focus-v2';
+const VERSION = 'focus-v3';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'shared.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/badge-96.png',

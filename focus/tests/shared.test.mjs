@@ -7,7 +7,7 @@ import {
   inQuietHours, digestDue, formatWhen, zonedToUtc,
   planMilestones, deadlineReminder, parsePerson, birthdayInfo, checkinStatus,
   eventOccurrence, busyNow, isStarToday, todayKey, fitsIn, reviewDue,
-  icsOccurrences, parseICS,
+  icsOccurrences, parseICS, filterOccurrences, cleanEventTitle,
 } from '../app/shared.js';
 
 const tz = 'Europe/Dublin';
@@ -304,4 +304,28 @@ test('calendar files: timetable repeats, exceptions, moves, deadlines', () => {
   // keys stay stable between syncs
   const again = icsOccurrences(text, new Date(now - 86400000), new Date(now.getTime() + 120 * 86400000), tz);
   assert.deepEqual(again.map((o) => o.key), occ.map((o) => o.key));
+});
+
+test('Brightspace noise: one task per assignment, preferring Due', () => {
+  const ev = (uid, summary, day, extra = '') => ['BEGIN:VEVENT', `UID:${uid}`, `DTSTART:202612${day}T170000Z`, `SUMMARY:${summary}`, extra, 'END:VEVENT'].filter(Boolean).join('\r\n');
+  const text = ['BEGIN:VCALENDAR',
+    ev('a1', 'Lab Report 3 - Availability Starts', '01'),
+    ev('a2', 'Lab Report 3 - Due', '05'),
+    ev('a3', 'Lab Report 3 - Due', '05'),          // published twice
+    ev('a4', 'Lab Report 3 - Availability Ends', '06'),
+    ev('b1', 'Quiz 4 - Start Date', '02'),
+    ev('b2', 'Quiz 4 - End Date', '09'),           // no Due entry: the end date is the deadline
+    ev('c1', 'Weekly announcement', '03'),
+    'END:VCALENDAR'].join('\r\n');
+  const occ = icsOccurrences(text, new Date('2026-11-18'), new Date('2027-01-01'), tz);
+  const kept = filterOccurrences(occ, 'deadlines', 'announcement');
+  assert.deepEqual(kept.map((o) => `${o.title} ${o.start.toISOString().slice(5, 10)}`), ['Lab Report 3 12-05', 'Quiz 4 12-09']);
+  assert.equal(cleanEventTitle('Essay 2 (Due)'), 'Essay 2');
+  assert.equal(cleanEventTitle('Assignment 1 is due'), 'Assignment 1');
+  // weekly items with the same name stay separate
+  const weekly = ['BEGIN:VCALENDAR', ev('w1', 'Problem sheet - Due', '07'), ev('w2', 'Problem sheet - Due', '14'), 'END:VCALENDAR'].join('\r\n');
+  assert.equal(filterOccurrences(icsOccurrences(weekly, new Date('2026-11-18'), new Date('2027-01-01'), tz), 'deadlines').length, 2);
+  // timetables: exact repeats merge
+  const tt = ['BEGIN:VCALENDAR', ev('t1', 'Lecture', '07'), ev('t2', 'Lecture', '07'), 'END:VCALENDAR'].join('\r\n');
+  assert.equal(filterOccurrences(icsOccurrences(tt, new Date('2026-11-18'), new Date('2027-01-01'), tz), 'timetable').length, 1);
 });

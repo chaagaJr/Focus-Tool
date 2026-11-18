@@ -411,7 +411,8 @@ a.copy { text-decoration: none; }
 
 /* Calendars in settings */
 .feed-list { list-style: none; margin: 0 0 12px; padding: 0; }
-.feed-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.feed-list li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.skip-form { flex-basis: 100%; }
 .feed-list .bad { color: var(--danger); }
 #feed-form { padding-top: 4px; }
 details.help { margin-top: 10px; font-size: 14px; }

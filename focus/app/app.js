@@ -1115,7 +1115,12 @@ function renderFeeds() {
     <li data-feed-id="${f.id}">
       <div><b>${esc(f.name)}</b> <span class="hint small">${f.type === 'deadlines' ? 'Deadlines' : 'Classes and shifts'}${f.tag ? `, #${esc(f.tag)}` : ''}</span>
       <div class="hint small ${f.last_error ? 'bad' : ''}">${f.last_error ? `Problem: ${esc(f.last_error)}` : `${f.count || 0} items, ${ago(f.last_sync)}`}</div></div>
-      <div class="chips"><button type="button" data-fact="sync">Sync now</button><button type="button" data-fact="remove">Remove</button></div>
+      <div class="chips"><button type="button" data-fact="sync">Sync now</button><button type="button" data-fact="filter">Filter</button><button type="button" data-fact="remove">Remove</button></div>
+      <form class="skip-form" hidden>
+        <label class="field"><span>Skip anything containing (separate with commas)</span>
+          <input name="skip" value="${esc((f.skip || []).join(', '))}" placeholder="announcement, optional" autocapitalize="off"></label>
+        <button type="submit" class="ghost small">Save filter and resync</button>
+      </form>
     </li>`).join('');
   $('#cal-link').disabled = !connected;
 }
@@ -1141,7 +1146,7 @@ feedForm.addEventListener('submit', async (e) => {
   const f = feedForm.elements;
   const feed = {
     name: f.name.value.trim(), url: f.url.value.trim(), type: f.type.value, tag: f.tag.value.trim(),
-    lead_minutes: +f.lead_minutes.value, busy: f.busy.checked, auto_plan: f.auto_plan.checked,
+    lead_minutes: +f.lead_minutes.value, busy: f.busy.checked, auto_plan: f.auto_plan.checked, skip: f.skip.value,
   };
   if (!feed.url) { f.url.focus(); return; }
   const btn = feedForm.querySelector('button[type="submit"]');
@@ -1165,7 +1170,14 @@ feedForm.addEventListener('submit', async (e) => {
 $('#feed-list').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-fact]');
   if (!b) return;
-  const id = b.closest('[data-feed-id]').dataset.feedId;
+  const li = b.closest('[data-feed-id]');
+  const id = li.dataset.feedId;
+  if (b.dataset.fact === 'filter') {
+    const form = li.querySelector('.skip-form');
+    form.hidden = !form.hidden;
+    if (!form.hidden) form.elements.skip.focus();
+    return;
+  }
   b.disabled = true;
   try {
     if (b.dataset.fact === 'sync') {
@@ -1182,6 +1194,24 @@ $('#feed-list').addEventListener('click', async (e) => {
     toast(err.message);
   } finally {
     b.disabled = false;
+  }
+});
+
+$('#feed-list').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target.closest('.skip-form');
+  const id = form.closest('[data-feed-id]').dataset.feedId;
+  const btn = form.querySelector('button');
+  btn.disabled = true;
+  try {
+    const r = await api('feed_save', { feed: { id, skip: form.elements.skip.value } });
+    toast(r.result.error ? `Saved, but syncing failed: ${r.result.error}` : `Filter saved: ${r.result.removed} removed, ${r.result.found} kept`, { ms: 5000 });
+    await loadFeeds();
+    await refresh();
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
   }
 });
 
