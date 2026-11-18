@@ -217,13 +217,15 @@
   </dialog>
 
   <!-- Settings -->
-  <dialog id="settings" class="sheet" aria-labelledby="settings-heading">
+  <dialog id="settings" class="sheet" aria-labelledby="settings-heading" data-page="">
     <div class="sheet-head">
+      <button class="text-btn back-btn" type="button" id="settings-back" hidden>‹ Settings</button>
       <h2 id="settings-heading">Settings</h2>
       <button class="text-btn" type="button" id="close-settings">Close</button>
     </div>
+    <nav class="set-menu" id="set-menu" aria-label="Settings sections"></nav>
 
-    <section class="set-group">
+    <section class="set-group" data-page="sync">
       <h3>Sync and reminders server</h3>
       <p class="hint" id="conn-status">Not connected. Everything is saved on this device only, and reminders only show while Focus is open.</p>
       <form id="conn-form" autocomplete="off">
@@ -241,7 +243,7 @@
       </form>
     </section>
 
-    <section class="set-group">
+    <section class="set-group" data-page="notifications">
       <h3>Notifications on this device</h3>
       <p class="hint" id="push-status"></p>
       <div class="row-actions">
@@ -250,7 +252,7 @@
       </div>
     </section>
 
-    <section class="set-group" id="cal-group">
+    <section class="set-group" data-page="calendars" id="cal-group">
       <h3>Calendars, timetable and college</h3>
       <p class="hint" id="cal-intro">Add calendar links and Focus keeps them in sync every few hours. Classes and shifts give you a heads-up and hold other reminders while they're on. Assignment deadlines become tasks with check-ins planned before them.</p>
       <ul class="feed-list" id="feed-list"></ul>
@@ -294,7 +296,7 @@
       </details>
     </section>
 
-    <section class="set-group">
+    <section class="set-group" data-page="calendar-link">
       <h3>Show Focus in your calendar</h3>
       <p class="hint">Your tasks with times, deadlines, your own events and birthdays, in Apple Calendar or Outlook. Read-only, updates every hour or so.</p>
       <div class="row-actions"><button type="button" class="ghost" id="cal-link">Get my calendar link</button></div>
@@ -305,7 +307,7 @@
       </div>
     </section>
 
-    <section class="set-group">
+    <section class="set-group" data-page="reminders">
       <h3>How reminders behave</h3>
       <form id="prefs-form">
         <div class="field-row">
@@ -352,7 +354,7 @@
       </form>
     </section>
 
-    <section class="set-group">
+    <section class="set-group" data-page="backup">
       <h3>Backup</h3>
       <p class="hint">The free database plan has no automatic backups, so download one now and then.</p>
       <div class="row-actions">
@@ -361,7 +363,7 @@
       </div>
     </section>
 
-    <section class="set-group">
+    <section class="set-group" data-page="typing">
       <h3>Typing shortcuts</h3>
       <ul class="cheats">
         <li><b>fri 5pm</b>, <b>tomorrow at 10</b>, <b>25/11</b>, <b>in 20 min</b>, <b>tonight</b>, <b>next week</b> set a reminder</li>

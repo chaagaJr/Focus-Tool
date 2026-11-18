@@ -854,6 +854,13 @@ export function expandEvent(ev, from, to, fallbackTz = DEFAULT_SETTINGS.tz) {
   return out;
 }
 
+/** Brightspace puts HTML in descriptions: keep just the text. */
+export function stripHtml(s) {
+  return String(s || '').replace(/<br\s*\/?>|<\/p>|<\/li>|<\/h\d>/gi, '\n').replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
+}
+
 const slug = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 24);
 
 /**
@@ -881,7 +888,8 @@ export function icsOccurrences(text, from, to, fallbackTz = DEFAULT_SETTINGS.tz)
           : ev.uid || `${title}|${occ.start.toISOString()}`,
         title: title || 'Untitled',
         rawTitle: ev.summary || '',
-        body: [ev.description, ev.url].filter(Boolean).join('\n').slice(0, 1000),
+        url: ev.url || '',
+        body: [stripHtml(ev.description), ev.url].filter(Boolean).join('\n').slice(0, 1000),
         location: ev.location || '',
         moduleTag: ev.categories?.length ? slug(ev.categories[0]) : null,
         type: ev.type,
@@ -935,10 +943,26 @@ export function filterOccurrences(occ, type, skip = []) {
   for (const g of groups.values()) {
     const due = g.filter((o) => o._due);
     let keep = due.length ? due : g.filter((o) => !o._start);
+    // Course content (lecture notes, topics) only has availability dates: that's not something you hand in
+    if (!due.length && g.every((o) => isCourseContent(o))) continue;
     if (!due.length && keep.some((o) => o._end)) keep = [keep.reduce((a, b) => (b.start > a.start ? b : a))];
-    out.push(...once(keep, dayKey));
+    out.push(...once(keep, dayKey).map((o) => ({ ...o, kind: deadlineKind(o) })));
   }
   return out.map(({ _due, _end, _start, ...o }) => o).sort((a, b) => a.start - b.start);
+}
+
+/** A Brightspace/Moodle content page (notes, slides, a topic) rather than an assignment or quiz. */
+export function isCourseContent(o) {
+  const where = `${o.url || ''} ${o.body || ''}`;
+  if (/\/(?:dropbox|quizzing|quiz|assign|assignment|discussions?|forum)\b/i.test(where)) return false;
+  return /\/d2l\/le\/content\/|\/mod\/(?:resource|page|folder|url|book)\b|^\s*units:/im.test(where);
+}
+
+/** "assignment" gets check-ins planned; a "test" just gets the reminder. */
+export function deadlineKind(o) {
+  const text = `${o.rawTitle || o.title} ${o.url || ''}`;
+  if (/\/quizzing\/|\/quiz\b|\b(?:quiz|test|exam|mcq|midterm)\b/i.test(text)) return 'test';
+  return 'assignment';
 }
 
 /** Text for a .ics file (calendar export). */

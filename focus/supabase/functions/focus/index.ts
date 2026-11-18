@@ -873,6 +873,13 @@ function expandEvent(ev, from, to, fallbackTz = DEFAULT_SETTINGS.tz) {
   return out;
 }
 
+/** Brightspace puts HTML in descriptions: keep just the text. */
+function stripHtml(s) {
+  return String(s || '').replace(/<br\s*\/?>|<\/p>|<\/li>|<\/h\d>/gi, '\n').replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
+}
+
 const slug = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 24);
 
 /**
@@ -900,7 +907,8 @@ function icsOccurrences(text, from, to, fallbackTz = DEFAULT_SETTINGS.tz) {
           : ev.uid || `${title}|${occ.start.toISOString()}`,
         title: title || 'Untitled',
         rawTitle: ev.summary || '',
-        body: [ev.description, ev.url].filter(Boolean).join('\n').slice(0, 1000),
+        url: ev.url || '',
+        body: [stripHtml(ev.description), ev.url].filter(Boolean).join('\n').slice(0, 1000),
         location: ev.location || '',
         moduleTag: ev.categories?.length ? slug(ev.categories[0]) : null,
         type: ev.type,
@@ -954,10 +962,26 @@ function filterOccurrences(occ, type, skip = []) {
   for (const g of groups.values()) {
     const due = g.filter((o) => o._due);
     let keep = due.length ? due : g.filter((o) => !o._start);
+    // Course content (lecture notes, topics) only has availability dates: that's not something you hand in
+    if (!due.length && g.every((o) => isCourseContent(o))) continue;
     if (!due.length && keep.some((o) => o._end)) keep = [keep.reduce((a, b) => (b.start > a.start ? b : a))];
-    out.push(...once(keep, dayKey));
+    out.push(...once(keep, dayKey).map((o) => ({ ...o, kind: deadlineKind(o) })));
   }
   return out.map(({ _due, _end, _start, ...o }) => o).sort((a, b) => a.start - b.start);
+}
+
+/** A Brightspace/Moodle content page (notes, slides, a topic) rather than an assignment or quiz. */
+function isCourseContent(o) {
+  const where = `${o.url || ''} ${o.body || ''}`;
+  if (/\/(?:dropbox|quizzing|quiz|assign|assignment|discussions?|forum)\b/i.test(where)) return false;
+  return /\/d2l\/le\/content\/|\/mod\/(?:resource|page|folder|url|book)\b|^\s*units:/im.test(where);
+}
+
+/** "assignment" gets check-ins planned; a "test" just gets the reminder. */
+function deadlineKind(o) {
+  const text = `${o.rawTitle || o.title} ${o.url || ''}`;
+  if (/\/quizzing\/|\/quiz\b|\b(?:quiz|test|exam|mcq|midterm)\b/i.test(text)) return 'test';
+  return 'assignment';
 }
 
 /** Text for a .ics file (calendar export). */
@@ -1288,9 +1312,9 @@ async function syncFeed(feed, settings, now = new Date()) {
       const due = o.allDay ? zonedToUtc(...(() => { const p = partsInTz(o.start, tz); return [p.y, p.m, p.d]; })(), 23, 59, tz) : o.start;
       if (ex) {
         const moved = ex.due_at !== due.toISOString();
-        if (!moved && ex.title === o.title) continue; // nothing changed; keep your edits
+        if (!moved && ex.title === o.title && ex.body === o.body) continue; // nothing changed; keep your edits
         rows.push(fullRow({
-          ...ex, title: o.title, due_at: due.toISOString(),
+          ...ex, title: o.title, body: o.body, due_at: due.toISOString(),
           remind_at: moved && !ex.done_at ? deadlineReminder(due, now, tz, settings.default_hour).toISOString() : ex.remind_at,
           last_nagged_at: moved ? null : ex.last_nagged_at,
         }));
@@ -1304,7 +1328,7 @@ async function syncFeed(feed, settings, now = new Date()) {
           source: feed.id, source_uid: o.key,
         }));
         // big pieces of work get check-ins; quick quizzes just get the reminder the morning before
-        if (feed.auto_plan && due - now > 7 * 86400000) toPlan.push({ id, title: o.title, tags, due_at: due.toISOString() });
+        if (feed.auto_plan && o.kind !== 'test' && due - now > 7 * 86400000) toPlan.push({ id, title: o.title, tags, due_at: due.toISOString() });
       }
     }
   }

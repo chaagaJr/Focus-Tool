@@ -421,3 +421,29 @@ details.help ul { padding-left: 18px; color: var(--muted); }
 details.help li { margin: 6px 0; }
 details.help b { color: var(--text); font-weight: 600; }
 a.ghost { display: inline-flex; align-items: center; text-decoration: none; }
+
+/* Settings: a menu, and one page per section */
+#settings[data-page=""] .set-group { display: none; }
+#settings:not([data-page=""]) .set-menu { display: none; }
+#settings:not([data-page=""]) .set-group:not([data-page]) { display: none; }
+#settings[data-page="sync"] .set-group:not([data-page="sync"]),
+#settings[data-page="notifications"] .set-group:not([data-page="notifications"]),
+#settings[data-page="calendars"] .set-group:not([data-page="calendars"]),
+#settings[data-page="calendar-link"] .set-group:not([data-page="calendar-link"]),
+#settings[data-page="reminders"] .set-group:not([data-page="reminders"]),
+#settings[data-page="backup"] .set-group:not([data-page="backup"]),
+#settings[data-page="typing"] .set-group:not([data-page="typing"]) { display: none; }
+#settings .set-group[data-page] { border-bottom: 0; }
+#settings .set-group[data-page] > h3 { display: none; }
+#settings > .sheet-head { gap: 8px; }
+#settings > .sheet-head h2 { margin-right: auto; }
+.back-btn { padding-left: 0; }
+.set-menu { padding: 4px 20px 8px; }
+.set-item {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 2px; background: none; border: 0; border-bottom: 1px solid var(--rule); text-align: left; color: var(--text);
+}
+.set-item b { display: block; font-size: 16px; font-weight: 650; }
+.set-item .hint { display: block; margin: 2px 0 0; }
+.set-item svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.set-item:hover b { color: var(--ink); }

@@ -989,7 +989,7 @@ function onListClick(e) {
     case 'copy': return copyItem(id);
     case 'toggle-done': state.ui.showDone = !state.ui.showDone; saveUi(); return render();
     case 'toggle-week': state.ui.showWeek = !state.ui.showWeek; saveUi(); return render();
-    case 'settings': return openSettings();
+    case 'settings': return openSettings('sync');
     case 'review': return openReview();
     case 'push': return enablePush();
     case 'hide-push': LS.set('hidePushBanner', true); return render();
@@ -1046,7 +1046,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '/') { e.preventDefault(); openSearch(); }
 });
 
-$('#sync').addEventListener('click', () => (state.conn ? refresh() : openSettings()));
+$('#sync').addEventListener('click', () => (state.conn ? refresh() : openSettings('sync')));
 
 /* ------------------------------------------------------------------ */
 /* Settings                                                            */
@@ -1229,7 +1229,45 @@ $('#cal-copy').addEventListener('click', () => {
   navigator.clipboard?.writeText($('#cal-url').textContent).then(() => toast('Calendar link copied'), () => toast('Select the link and copy it'));
 });
 
-async function openSettings() {
+const SETTINGS_PAGES = [
+  ['sync', 'Sync and server', () => (state.conn ? 'Connected' : 'This device only: set up sync and reminders')],
+  ['notifications', 'Notifications', () => (state.pushOn ? 'On for this device' : 'Off on this device')],
+  ['calendars', 'Calendars and college', () => (state.feeds.length ? `${state.feeds.length} ${state.feeds.length === 1 ? 'calendar' : 'calendars'}${state.feeds.some((f) => f.last_error) ? ', one needs a look' : ''}` : 'Timetable, Brightspace, Moodle, work rota')],
+  ['calendar-link', 'Focus in your calendar', () => 'Show Focus in Apple Calendar, Outlook or Notion Calendar'],
+  ['reminders', 'Reminders and summaries', () => {
+    const st = state.settings;
+    return [st.quiet_start && st.quiet_end ? `quiet ${st.quiet_start}–${st.quiet_end}` : 'no quiet hours', st.digest_time ? `summary ${st.digest_time}` : '', `review ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][st.review_day ?? 0]} ${st.review_time || 'off'}`].filter(Boolean).join(', ');
+  }],
+  ['backup', 'Backup', () => 'Download or restore everything'],
+  ['typing', 'Typing shortcuts', () => 'What you can type in the box'],
+];
+
+function renderSettingsMenu() {
+  $('#set-menu').innerHTML = SETTINGS_PAGES.map(([id, label, sub]) => `
+    <button type="button" class="set-item" data-goto="${id}">
+      <span><b>${esc(label)}</b><span class="hint small">${esc(sub())}</span></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+    </button>`).join('');
+}
+
+function showSettingsPage(id = '') {
+  setDlg.dataset.page = id;
+  const page = SETTINGS_PAGES.find(([p]) => p === id);
+  $('#settings-heading').textContent = page ? page[1] : 'Settings';
+  $('#settings-back').hidden = !page;
+  if (!page) renderSettingsMenu();
+  setDlg.scrollTop = 0;
+}
+
+$('#set-menu').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-goto]');
+  if (b) showSettingsPage(b.dataset.goto);
+});
+$('#settings-back').addEventListener('click', () => showSettingsPage(''));
+
+async function openSettings(page = '') {
+  if (typeof page !== 'string') page = '';
+  showSettingsPage(page);
   const f = connForm.elements;
   f.url.value = state.conn?.url || '';
   f.key.value = state.conn?.key || '';
@@ -1251,7 +1289,8 @@ async function openSettings() {
       state.settings = { ...state.settings, ...r.settings };
       LS.set('settings', state.settings);
       fillPrefs();
-      loadFeeds();
+      await loadFeeds();
+      if (!setDlg.dataset.page) renderSettingsMenu();
     } catch (e) { connStatus(`Connected, but the server didn't answer: ${e.message}`, 'bad'); }
   }
 }
@@ -1291,7 +1330,7 @@ connForm.addEventListener('submit', async (e) => {
     }
     if (firstTime) { state.queue = []; LS.set('queue', state.queue); }
     await refresh();
-    openSettings();
+    openSettings('sync');
   } catch (err) {
     connStatus(err.status === 401
       ? 'The server rejected that key. It must match the FOCUS_KEY secret in Supabase exactly.'
@@ -1312,7 +1351,7 @@ $('#conn-forget').addEventListener('click', async () => {
   await writeSwConfig();
   setSync('local');
   render();
-  openSettings();
+  openSettings('sync');
   toast('Disconnected. What you see stays on this device.');
 });
 
@@ -1398,8 +1437,8 @@ function b64ToBytes(b64) {
 const sameKey = (buf, bytes) => buf && new Uint8Array(buf).every((v, i) => v === bytes[i]);
 
 async function enablePush() {
-  if (!state.conn) { openSettings(); return; }
-  if (isIOS && !isStandalone) { openSettings(); return; }
+  if (!state.conn) { openSettings('sync'); return; }
+  if (isIOS && !isStandalone) { openSettings('notifications'); return; }
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) { toast("This browser can't receive push notifications"); return; }
   try {
     const perm = await Notification.requestPermission();

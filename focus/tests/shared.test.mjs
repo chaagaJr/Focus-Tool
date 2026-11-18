@@ -329,3 +329,17 @@ test('Brightspace noise: one task per assignment, preferring Due', () => {
   const tt = ['BEGIN:VCALENDAR', ev('t1', 'Lecture', '07'), ev('t2', 'Lecture', '07'), 'END:VCALENDAR'].join('\r\n');
   assert.equal(filterOccurrences(icsOccurrences(tt, new Date('2026-11-18'), new Date('2027-01-01'), tz), 'timetable').length, 1);
 });
+
+test('Brightspace content availability is not a deadline; tests get no check-ins', () => {
+  const ev = (uid, summary, day, desc = '', url = '') => ['BEGIN:VEVENT', `UID:${uid}`, `DTSTART:202612${day}T080000Z`, `SUMMARY:${summary}`,
+    desc && `DESCRIPTION:${desc}`, url && `URL:${url}`, 'END:VEVENT'].filter(Boolean).join('\r\n');
+  const text = ['BEGIN:VCALENDAR',
+    ev('n1', 'Topic 8: TREATMENT OF TENDON INJURIES – Availability Ends', '19', 'Units:\\nTopic 8 - https://brightspace.ucd.ie/d2l/le/content/400123/viewContent/1/View'),
+    ev('n2', 'Week/Topic 3: MUSCLE INJURIES – Availability Ends', '19', '<p>Topic 3 describes the <b>anatomy</b></p>', 'https://brightspace.ucd.ie/d2l/le/content/400123/viewContent/2/View'),
+    ev('q1', 'Class Test 3 – Availability Ends', '30', 'Questions cover weeks 1 to 11', 'https://brightspace.ucd.ie/d2l/lms/quizzing/user/quiz_summary.d2l?qi=1'),
+    ev('d1', 'Group Design Projects - Due', '29', '<p>1 document per group</p>', 'https://brightspace.ucd.ie/d2l/lms/dropbox/user/folder_submit_files.d2l?db=9'),
+    'END:VCALENDAR'].join('\r\n');
+  const kept = filterOccurrences(icsOccurrences(text, new Date('2026-11-18'), new Date('2027-01-01'), tz), 'deadlines');
+  assert.deepEqual(kept.map((o) => [o.title, o.kind]), [['Group Design Projects', 'assignment'], ['Class Test 3', 'test']]);
+  assert.equal(kept[0].body.split('\n')[0], '1 document per group', 'HTML stripped');
+});
