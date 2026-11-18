@@ -1522,7 +1522,22 @@ function inPageReminders() {
 /* ------------------------------------------------------------------ */
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('Service worker not registered', e));
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+    .then((reg) => {
+      // look for a new version whenever Focus comes back to the screen
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+    })
+    .catch((e) => console.warn('Service worker not registered', e));
+  // a new version took over: reload once so you see it straight away (not mid-edit)
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    const busy = document.querySelector('dialog[open]') || (document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName) && document.activeElement.value);
+    if (busy) toast('Focus has been updated', { ms: 10000, actions: [{ label: 'Reload', run: () => location.reload() }] });
+    else location.reload();
+  });
   navigator.serviceWorker.addEventListener('message', (e) => {
     if (e.data?.type === 'open' && e.data.id) refresh().then(() => openEditor(e.data.id));
     if (e.data?.type === 'open-url' && e.data.url) handleParams(new URL(e.data.url, location.href).searchParams);

@@ -2,7 +2,7 @@
 // shows reminder notifications, and handles their Done / Snooze buttons.
 //
 // When you change any app file, bump VERSION so phones and PCs pick up the new copy.
-const VERSION = 'focus-v4';
+const VERSION = 'focus-v5';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'shared.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/badge-96.png',
@@ -34,6 +34,10 @@ self.addEventListener('fetch', (e) => {
       if (res.ok) cache.put(req, res.clone());
       return res;
     });
+    // the page itself: try the network briefly so updates show on first open, fall back to the copy
+    if (cached && req.mode === 'navigate') {
+      try { return await Promise.race([fresh, new Promise((_, no) => setTimeout(no, 1500))]); } catch { return cached; }
+    }
     if (cached) { e.waitUntil(fresh.catch(() => {})); return cached; }
     try {
       return await fresh;
