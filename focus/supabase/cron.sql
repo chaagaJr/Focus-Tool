@@ -20,7 +20,7 @@ select cron.schedule(
     url     := 'https://hyqxytmodzuharzrbpfh.supabase.co/functions/v1/focus',
     headers := jsonb_build_object(
                  'Content-Type', 'application/json',
-                 'x-focus-key',  'fk_LEuW2VYQ5ALYRy3Psc81Vle6okYDwpUb'
+                 'x-focus-key',  'YOUR-FOCUS-KEY'
                ),
     body    := jsonb_build_object('action', 'tick')
   );
